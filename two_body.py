@@ -36,6 +36,25 @@ def module(v):
 def compute_angle_from_vectors(v1,v2):
         return np.arccos(np.inner(v1,v2)/(module(v1)*module(v2)))
 # инициализируем начальные данные
+def init_data_from_file():
+    file = open ("data.txt", "r")
+    print("m первого тела ")
+    b1.m = int(file.readline())
+    print("v0 первого тела ")
+    b1.v = np.array ([i for i in file.readline().split()], float)
+    print("r0 первого тела ")
+    b1.r = np.array ([i for i in file.readline().split()], float)
+    print("---Перво тело----")
+    b1.info()
+    print("m второго тела ")
+    b2.m = int(file.readline())
+    print("v0 второго тела ")
+    b2.v = np.array ([i for i in file.readline().split()], float)
+    print("r0 второго тела ")
+    b2.r = np.array ([i for i in file.readline().split()], float)
+    print("---Второе тело----")
+    b2.info()
+    file.close()
 def init_data():
     print("m первого тела ")
     b1.m = float(input())
@@ -149,7 +168,7 @@ def compute_data():
     print_vector("r ", r)
     u  = np.arccos(r[0]/module(r))#угол в полярной системе коордиант
     w = 1/module(r)  - hi_2/pow(module(c),2)
-    A = np.sqrt(hi_2*hi_2/pow(module(c),4) + 2*h/pow(module(c),2))
+    A = np.sqrt(hi_2**2/pow(module(c),4) + 2*h/pow(module(c),2))
     θ = np.arccos(w/A)# тэта - аномалия
     g = u  - θ
     print("g:{0}".format(g))

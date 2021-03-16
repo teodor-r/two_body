@@ -3,21 +3,34 @@ import numpy as np
 import math
 from glumpy import app, gloo, gl
 
-tb.init_data()
+tb.init_data_from_file()
 tb.compute_data()
 
-tao = 0.05
+tao = 0.001
 n = np.sqrt(tb.hi_2) * pow(tb.a,-3/2)
 print("n {0}".format(n))
 β = tb.e/(1+np.sqrt(1-tb.e*tb.e))
 mdle = np.sqrt((1+tb.e)/(1-tb.e))
 E =  np.arctan(np.tan(tb.θ/2)/mdle)*2
-
 print("E {0}".format(E))
 M = E - tb.e* np.sin(E)
 print("M {0}".format(M))
 T = M/n
 print("T {0}".format(T))
+
+
+r1 =  tb.b1.r
+v01 = tb.b1.v
+
+r2 =  tb.b2.r
+v02 = tb.b2.v
+
+m1 = tb.b1.m
+m2 = tb.b2.m
+r =  r2 - r1
+
+bc_r = tb.bc.r
+bc_v = tb.bc.v
 
 tb.b1.r = np.dot(tb.A, np.transpose(tb.b1.r))
 tb.b1.v = np.dot(tb.A, np.transpose(tb.b1.v))
@@ -51,40 +64,45 @@ def compute_traectory(time):
 
     return [(tb.b1.r[0],tb.b1.r[1]),(tb.b2.r[0],tb.b2.r[1])]
 
-def f (t, summm, cur_vector, m):
-    n_summ = summm * tao + cur_vector * t / (tb.G * m)
-    return n_summ * tb.G * m
 
-r1 =  tb.b1.r
-v01 = tb.b1.v
-
-r2 =  tb.b2.r
-v02 = tb.b2.v
-
-m1 = tb.b1.m
-m2 = tb.b2.m
-r =  r2 - r1
 summ = np.array([0,0,0],float)
-summ = (r / (tb.module(r ) ** 3)) * tao
+#summ = (r / (tb.module(r ) ** 3)) * tao
+def f (t, summm, cur_vector, m):
+    n_summ = summm *tao + cur_vector * t/ (tb.G * m)
+    return n_summ * tb.G * m
 def compute_traectory_rk(time):
-    global summ,r1,r2, v02, v01, r
+    global summ, r1, r2, v02, v01, r, file
+    file = open("output.txt", 'w')
 
-    k1 = f(tao, summ, np.array([0,0,0],float),-m1)
-    k2 = f(3 * tao / 2, summ , (k1 * tao / 2),-m1)
-    k3 = f(3 * tao / 2, summ , (k2 * tao / 2),-m1)
-    k4 = f(2 * tao, summ , k3 * tao,-m1)
-    r2 = r2 + v02 * tao + (k1 + k2*2 + k3*2 + k4) / 6
+    rc = bc_r + bc_v * time
 
+    k1 = f(tao, summ, np.array([0, 0, 0], float), -m1)
+    file.write("k1 = " + str(k1) + "\n")
+    k2 = f(3 * tao / 2, summ, (k1 * tao / 2), -m1)
+    file.write("k2 = " + str(k2) + "\n")
+    k3 = f(3 * tao / 2, summ, (k2 * tao / 2), -m1)
+    file.write("k3 = " + str(k3) + "\n")
+    k4 = f(2 * tao, summ, k3 * tao, -m1)
+    file.write("k4 = " + str(k4) + "\n")
+    r2 = r2 + v02 * tao + (k1 + k2 * 2 + k3 * 2 + k4) / 6
+    file.write("r2 = " + str(r2) + "\n" + "--------------------------------------------------------------------------------" + '\n')
     k1 = f(tao, summ, np.array([0, 0, 0], float), m2)
+    file.write("k1 = " + str(k1) + "\n")
     k2 = f(3 * tao / 2, summ, (k1 * tao / 2), m2)
+    file.write("k2 = " + str(k2) + "\n")
     k3 = f(3 * tao / 2, summ, (k2 * tao / 2), m2)
+    file.write("k3 = " + str(k3) + "\n")
     k4 = f(2 * tao, summ, k3 * tao, m2)
+    file.write("k4 = " + str(k4) + "\n")
     r1 = r1 + v01 * tao + (k1 + k2 * 2 + k3 * 2 + k4) / 6
+    file.write("r1 = " + str(
+        r1) + "\n" + "--------------------------------------------------------------------------------" + "\n")
+    r = r2 - r1
+    summ = summ + (r / (tb.module(r) ** 3)) * tao
 
-    r =  r2 - r1
-    summ = summ + (r  / (tb.module(r) ** 3)) * tao
-
-    return [(r1[0],r1[1]),(r2[0],r2[1])]
+    r1_c = r1 - rc
+    r2_c = r2 - rc
+    return [(r1_c[0], r1_c[1]), (r2_c[0], r2_c[1])]
 
 
 
@@ -113,9 +131,9 @@ fragment = """
 quad = gloo.Program(vertex, fragment, count=4)
 
 # Upload data into GPU
-quad['color'] = [ (0,0,0,1), (0,0,0,1), (1,1,0,1), (1,1,0,1) ]
+quad['color'] = [ (0,0,0,1), (0,0,0,1), (0,1,0,1), (0,1,0,1) ]
 quad['position'] = [(r1[0], r[1]),(r2[0], r2[1]),(r1[0], r[1]),(r2[0], r2[1])]
-quad['scale'] = 0.05
+quad['scale'] = 1
 
 # Create a window with a valid GL context
 window = app.Window(color=(1,1,1,1))
@@ -128,8 +146,8 @@ def on_draw(dt):
     global time
     window.clear()
     #quad["scale"] = math.cos(time)
-    quad['position'] = compute_traectory(time) + compute_traectory_rk(time)
     time += tao
+    quad['position'] = compute_traectory(time) + compute_traectory_rk(time)
     quad.draw(gl.GL_POINTS)
 
 # We set the framecount to 360 in order to record a movie that can
