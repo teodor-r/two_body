@@ -6,18 +6,19 @@ from glumpy import app, gloo, gl
 tb.init_data_from_file()
 tb.compute_data()
 
-tao = 0.001
+tao = 0.01
+file = open ("diff1-2.txt", "w")
 n = np.sqrt(tb.hi_2) * pow(tb.a,-3/2)
 print("n {0}".format(n))
 β = tb.e/(1+np.sqrt(1-tb.e*tb.e))
 mdle = np.sqrt((1+tb.e)/(1-tb.e))
-E =  np.arctan(np.tan(tb.θ/2)/mdle)*2
+E = -np.arctan(np.tan(tb.θ/2)/mdle)*2
 print("E {0}".format(E))
 M = E - tb.e* np.sin(E)
 print("M {0}".format(M))
 T = M/n
 print("T {0}".format(T))
-
+E = 0
 
 r1 =  tb.b1.r
 v01 = tb.b1.v
@@ -54,57 +55,62 @@ def compute_traectory(time):
     #rc = tb.bc.r + tb.bc.v * time #для инерциальной системы O1.
     rc = np.array([0,0,0],float) # для системы координат в центр масс, также инерциальна
 
-
     tb.b1.r = rc- r0 * (tb.b2.m/ tb.bc.m)
     tb.b2.r = rc + r0 * (tb.b1.m / tb.bc.m)
     A = tb.A
     A = tb.np.linalg.inv(A)
     tb.b1.r = np.dot(A, tb.np.transpose(tb.b1.r))
-    tb.b2.r = np.dot(A,  tb.np.transpose(tb.b2.r))
-
+    tb.b2.r = np.dot(A, tb.np.transpose(tb.b2.r))
     return [(tb.b1.r[0],tb.b1.r[1]),(tb.b2.r[0],tb.b2.r[1])]
 
+epsilon = 0.0005
 
-summ = np.array([0,0,0],float)
-#summ = (r / (tb.module(r ) ** 3)) * tao
+def compute_angle (vec1, vec2):
+    sum = 0
+    for i in range (3):
+        sum = sum + vec1[i] * vec2[i]
+    return ((sum) / (tb.module(vec1) * tb.module(vec2)))
+
+#summ = np.array([0,0,0],float)
+summ_euler = np.array ([0, 0, 0], float)
+summ = (r / (tb.module(r) ** 3)) * tao
 def f (t, summm, cur_vector, m):
     n_summ = summm *tao + cur_vector * t/ (tb.G * m)
     return n_summ * tb.G * m
+
+def rotate_by_angle (Dot, phi):
+    matrix = np.array ([[np.cos(phi), -1 * np.sin(phi), 0.], [np.sin(phi), np.cos(phi), 0.], [0., 0., 0.]])
+    return np.dot (matrix, Dot)
+
+last_speed_rk = v01
 def compute_traectory_rk(time):
-    global summ, r1, r2, v02, v01, r, file
-    file = open("output.txt", 'w')
-
+    global summ, summ_euler, r1, r2, v02, v01, r, file, tao, last_speed_rk
     rc = bc_r + bc_v * time
-
     k1 = f(tao, summ, np.array([0, 0, 0], float), -m1)
-    file.write("k1 = " + str(k1) + "\n")
     k2 = f(3 * tao / 2, summ, (k1 * tao / 2), -m1)
-    file.write("k2 = " + str(k2) + "\n")
     k3 = f(3 * tao / 2, summ, (k2 * tao / 2), -m1)
-    file.write("k3 = " + str(k3) + "\n")
     k4 = f(2 * tao, summ, k3 * tao, -m1)
-    file.write("k4 = " + str(k4) + "\n")
+    r2_euler = r2 + v02 * tao + k1 * tao
     r2 = r2 + v02 * tao + (k1 + k2 * 2 + k3 * 2 + k4) / 6
-    file.write("r2 = " + str(r2) + "\n" + "--------------------------------------------------------------------------------" + '\n')
     k1 = f(tao, summ, np.array([0, 0, 0], float), m2)
-    file.write("k1 = " + str(k1) + "\n")
     k2 = f(3 * tao / 2, summ, (k1 * tao / 2), m2)
-    file.write("k2 = " + str(k2) + "\n")
     k3 = f(3 * tao / 2, summ, (k2 * tao / 2), m2)
-    file.write("k3 = " + str(k3) + "\n")
     k4 = f(2 * tao, summ, k3 * tao, m2)
-    file.write("k4 = " + str(k4) + "\n")
+    r1_euler = r1 + v01 * tao + k1 * tao
     r1 = r1 + v01 * tao + (k1 + k2 * 2 + k3 * 2 + k4) / 6
-    file.write("r1 = " + str(
-        r1) + "\n" + "--------------------------------------------------------------------------------" + "\n")
+    r_euler = r2_euler - r1_euler
     r = r2 - r1
+    summ_euler = summ_euler + (r_euler / (tb.module(r_euler) ** 3)) * tao
     summ = summ + (r / (tb.module(r) ** 3)) * tao
-
     r1_c = r1 - rc
     r2_c = r2 - rc
-    return [(r1_c[0], r1_c[1]), (r2_c[0], r2_c[1])]
-
-
+    r1_euler = r1_euler - rc
+    r2_euler = r2_euler - rc
+    #r1_c = rotate_by_angle(r1_c, np.pi * 1.1)
+    #r2_c = rotate_by_angle(r2_c, np.pi * 1.1)
+    #r1_euler = rotate_by_angle(r1_euler, np.pi * 1.1)
+    #r2_euler = rotate_by_angle(r2_euler, np.pi * 1.1)
+    return [(r1_c[0], r1_c[1]), (r2_c[0], r2_c[1]),(r1_euler[0], r1_euler[1]), (r2_euler[0], r2_euler[1])]
 
 vertex = """
   attribute vec2 position;
@@ -125,29 +131,38 @@ fragment = """
       gl_FragColor = v_color;
   } """
 
-
+scale_diff = 0.1
 
 # Build the program and corresponding buffers (with 4 vertices)
-quad = gloo.Program(vertex, fragment, count=4)
+quad = gloo.Program(vertex, fragment, count=6)
 
 # Upload data into GPU
-quad['color'] = [ (0,0,0,1), (0,0,0,1), (0,1,0,1), (0,1,0,1) ]
-quad['position'] = [(r1[0], r[1]),(r2[0], r2[1]),(r1[0], r[1]),(r2[0], r2[1])]
-quad['scale'] = 1
+quad['color'] = [ (1,0,0,1), (1,0,0,1), (0,1,0,1), (0,1,0,1), (0,0,1,1), (0,0,1,1)]
+quad['position'] = [(r1[0], r[1]),(r2[0], r2[1]),(r1[0], r[1]),(r2[0], r2[1]), (r1[0], r[1]),(r2[0], r2[1])]
+quad['scale'] = 0.5
+
+def reduce_scale ():
+    global quad
+    scale = quad['scale'][0]
+    for i in quad['position']:
+        while ((abs(i[0]) * scale + scale_diff > 1) or (abs(i[1]) * scale + scale_diff > 1)):
+            scale = 0.999 * scale
+    quad['scale'] = scale
 
 # Create a window with a valid GL context
 window = app.Window(color=(1,1,1,1))
-
 
 # Tell glumpy what needs to be done at each redraw
 @window.event
 
 def on_draw(dt):
-    global time
-    window.clear()
+    global time, file
+    #window.clear()
     #quad["scale"] = math.cos(time)
     time += tao
     quad['position'] = compute_traectory(time) + compute_traectory_rk(time)
+    file.write(str(tb.module(quad['position'][0] - quad['position'][2])) + "\n")
+    reduce_scale()
     quad.draw(gl.GL_POINTS)
 
 # We set the framecount to 360 in order to record a movie that can

@@ -31,7 +31,10 @@ def print_vector(vn ,v):
     print(vn + " =  [{0},{1},{2}]".format(v[0], v[1], v[2]))
 
 def module(v):
-    return np.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+    sum = 0
+    for i in v:
+        sum = sum + i * i
+    return np.sqrt(sum)
 
 def compute_angle_from_vectors(v1,v2):
         return np.arccos(np.inner(v1,v2)/(module(v1)*module(v2)))
